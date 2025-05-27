@@ -101,3 +101,35 @@ class CreateOrUpdateRoleView(APIView):
             return Response({"error": f"Missing field: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+        
+class CreateOnboardingView(APIView):
+    def post(self, request):
+
+        role_controller = RoleController()
+        onboarding_controller = OnboardingController()
+        data = request.data
+
+        try:    
+            user = request.user
+            
+            name = data.get("onboarding_name")
+            user_roles = role_controller.get_user_roles(user)
+            description = data.get("description")
+            if not user_roles.exists():
+                return Response({"error": "User has no roles assigned."}, status=status.HTTP_400_BAD_REQUEST)
+
+            user_role = user_roles.first()
+
+            onboarding_instance = onboarding_controller.create_onboarding(name, description, user_role)
+
+            return Response({
+                "message": "Onboarding instance created successfully",
+                "role_id": onboarding_instance.id,
+                "role_name": onboarding_instance.name
+            })   
+        except KeyError as e:
+            return Response({"error": f"Missing field: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
+
+    
