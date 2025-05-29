@@ -4,10 +4,11 @@ from rest_framework import status
 
 
 # Create your views here.
-from accounts.models import Organization, Branch
+from accounts.models import Organization, Branch, Onboarding
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from accounts.controllers import RoleController, OnboardingController, UserController
+from .serializers import CompletedOnboardingStepSerializer
 
 
 
@@ -132,4 +133,110 @@ class CreateOnboardingView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
 
-    
+
+class CreateOnboardingStepView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        onboarding_controller = OnboardingController()
+        data = request.data
+
+        try:
+            onboarding_id = data.get("onboarding_id")
+            step_name = data.get("step_name")
+            description = data.get("description", "")
+            level = data.get("level", 1)
+            optional = data.get("optional", False)
+
+            if not onboarding_id or not step_name:
+                return Response(
+                    {"error": "Missing required fields: 'onboarding_id' and 'step_name'"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Get the onboarding instance
+            try:
+                onboarding = Onboarding.objects.get(id=onboarding_id)
+            except Onboarding.DoesNotExist:
+                return Response({"error": "Onboarding not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Create the onboarding step using the controller
+            step = onboarding_controller.create_onboarding_step(
+                onboarding=onboarding,
+                step_name=step_name,
+                description=description,
+                level=level,
+                optional=optional,
+            )
+
+            return Response({
+                "message": "Onboarding step created successfully",
+                "step_id": step.id,
+                "step_name": step.name,
+                "level": step.level,
+                "optional": step.optional,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+        
+
+class CompletedOnboardingStepsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        onboarding_name = request.query_params.get("onboarding_name")
+        onboarding_controller = OnboardingController()
+
+        if not onboarding_name:
+            return Response(
+                {"error": "Missing required query parameter: 'onboarding_name'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            completed_steps = onboarding_controller.get_all_completed_steps(onboarding_name)
+
+            # You need a serializer to represent these steps — assumed here
+            serialized = CompletedOnboardingStepSerializer(completed_steps, many=True)
+
+            return Response({"completed_steps": serialized.data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
+        
+
+class SetOnboardingStepDoneView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        data = request.data
+        onboarding_name = data.get("onboarding_name")
+        step_name = data.get("step_name")
+        status_value = data.get("status", "done")  # optional, default to "done"
+
+        if not onboarding_name or not step_name:
+            return Response({
+                "error": "onboarding_name and step_name are required."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        onboarding_controller = OnboardingController()
+
+        try:
+            onboarding = onboarding_controller.get_onboarding(onboarding_name)
+            onboarding_step = onboarding_controller.get_onboarding_step_by_name(onboarding, step_name)
+            completed_step = onboarding_controller.set_completed_step(
+                user=user,
+                onboarding_step=onboarding_step,
+                status=status_value
+            )
+
+            return Response({
+                "message": "Step marked as completed.",
+                "step_id": completed_step.id,
+                "step_status": completed_step.step_status
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
