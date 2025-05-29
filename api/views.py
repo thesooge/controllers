@@ -4,10 +4,10 @@ from rest_framework import status
 
 
 # Create your views here.
-from accounts.models import Organization, Branch, Onboarding
+from accounts.models import Organization, Branch, Onboarding, MembershipTier
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from accounts.controllers import RoleController, OnboardingController, UserController
+from accounts.controllers import RoleController, OnboardingController, UserController, MembershipController
 from .serializers import CompletedOnboardingStepSerializer
 
 
@@ -238,5 +238,26 @@ class SetOnboardingStepDoneView(APIView):
                 "step_status": completed_step.step_status
             }, status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
+        
+
+class CancelMembershipView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        membership_id = request.data.get("membership_id")
+        if not membership_id:
+            return Response(
+                {"error": "membership_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            membership = MembershipTier.objects.get(id=membership_id)
+            MembershipController.cancel_membership(membership)
+            return Response({"message": "Membership cancelled successfully."}, status=status.HTTP_200_OK)
+        except MembershipTier.DoesNotExist:
+            return Response({"error": "Membership not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
