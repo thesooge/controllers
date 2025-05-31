@@ -4,11 +4,13 @@ from rest_framework import status
 
 
 # Create your views here.
-from accounts.models import Organization, Branch, Onboarding, MembershipTier
+from accounts.models import Organization, Branch, Onboarding, MembershipTier, SubscriptionTier
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from accounts.controllers import RoleController, OnboardingController, UserController, MembershipController
 from .serializers import CompletedOnboardingStepSerializer
+
+from .controllers import CustomMembershipController
 
 
 
@@ -261,3 +263,57 @@ class CancelMembershipView(APIView):
             return Response({"error": "Membership not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
+        
+class CreateMembershipView(APIView):
+    def post(self, request):
+        user = request.user
+        tier_id = request.data.get("subscription_tier_id")
+
+        try:
+            subscription_tier = SubscriptionTier.objects.get(id=tier_id)
+        except SubscriptionTier.DoesNotExist:
+            return Response({"error": "Subscription tier not found"}, status=404)
+
+        membership = CustomMembershipController.create_membership(user, subscription_tier)
+
+        return Response({
+            "message": "Membership created",
+            "membership_id": membership.membership_id
+        }, status=201)        
+    
+
+class AssignMembershipRolesView(APIView):
+    def post(self, request):
+        user = request.user
+        membership = CustomMembershipController.get_active_membership(user)
+        if not membership:
+            return Response({"error": "No active membership"}, status=400)
+
+        MembershipController.assign_roles_from_tier(membership)
+        return Response({"message": "Roles assigned successfully"})    
+    
+class CreateSubscriptionTierView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+
+        try:
+            tier = CustomMembershipController.create_subscription_tier(
+                title=data.get("title"),
+                description1=data.get("description1"),
+                description2=data.get("description2"),
+                description3=data.get("description3"),
+                price=data.get("price"),
+                is_active=data.get("is_active", True),
+                role_template_ids=data.get("role_template_ids", []),
+                payment_plans=data.get("payment_plans", {}),
+            )
+
+            return Response({
+                "message": "Subscription tier created successfully.",
+                "tier_id": tier.id
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)    
