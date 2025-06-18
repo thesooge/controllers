@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -194,17 +198,29 @@ MIGRATION_MODULES = {
     'accounts': 'accounts.custom_migrations',
 }
 
-ACCOUNT_EMAIL_VERIFICATION = 'optional'
-
 ACCOUNT_LOGIN_METHODS = {'email'}
-ACCOUNT_SIGNUP_FIELDS = ['email', 'username*', 'password1*', 'password2*']
-
-ACCOUNT_SIGNUP_FIELDS = {
-    "email": {"required": True},
-    "username": {"required": False},
-    "password1": {"required": True},
-    "password2": {"required": True},
+EMAIL_CONFIRMATION_AUTHENTICATED_REDIRECT_URL= "http://localhost:8000/"
+ACCOUNTS_CONFIRM_EMAIL= {   #these are detail of the confirmation email
+    "TEMPLATE_DIR": "accounts/confirm_email.html",  # directory of email template(should be an html)(note: it should have these place holders: user, activate_url)
+    "EMAIL_SUBJECT": "Confirm your email",  # subject of the email
+    "DYNAMIC_DATA": {"something": "this is confirm"}    # dynamic data that you want to show in the html(you should add it to the html by place holders)
 }
+
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1', 'password2']
 
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_REQUIRED = True
+
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None 
+
+
+
+
+# Use standard SMTP settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_USE_TLS = True
+EMAIL_PORT = 587  # For SSL (use 587 for TLS)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')

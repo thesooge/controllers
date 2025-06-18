@@ -1,10 +1,14 @@
+from django.utils import timezone
 from django.shortcuts import render
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
-
+from allauth.account.utils import complete_signup
+from api.api_settings import api_settings
+from allauth.account import app_settings as allauth_account_settings
+from allauth.account.models import EmailAddress
 
 # Create your views here.
-from accounts.models import Organization, Branch, Onboarding, MembershipTier, SubscriptionTier
+from accounts.models import Organization, Branch, Onboarding, MembershipTier, SubscriptionTier, OnboardingStep
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from accounts.controllers import RoleController, OnboardingController, UserController, MembershipController
@@ -317,3 +321,70 @@ class CreateSubscriptionTierView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)    
+        
+
+class UserSignupWithOnboardingView(APIView):
+    """
+    Custom Signup API with onboarding integration.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        onboarding_controller = OnboardingController()
+        # 1️⃣ Validate & register user using existing REGISTER_SERIALIZER
+        serializer = api_settings.REGISTER_SERIALIZER(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save(request)
+
+        # 2️⃣ If needed, create tokens (JWT or DRF Token)
+        tokens = None
+        # if api_settings.USE_JWT:
+        #     access_token, refresh_token = jwt_encode(user)
+        #     tokens = {
+        #         "access": access_token,
+        #         "refresh": refresh_token,
+        #     }
+        # elif TokenModel:
+        #     token, created = TokenModel.objects.get_or_create(user=user)
+        #     tokens = {
+        #         "token": token.key,
+        #     }
+
+        # 3️⃣ Trigger the email confirmation
+        complete_signup(
+            request._request,
+            user,
+            allauth_account_settings.EMAIL_VERIFICATION,
+            None
+        )
+        onboarding = Onboarding.objects.get(name="Default Onboarding")
+
+        # 4️⃣ Initialize onboarding step if needed
+        # Example: assuming you have an OnboardingStatus model
+        step = onboarding_controller.create_onboarding_step(
+            onboarding=onboarding,
+            step_name="Verify Email",
+            description="Please verify your email to activate your account.",
+            level=1,
+            optional=False,
+        )
+
+        # 5️⃣ Return response
+        response_data = {
+            "detail": "Verification e-mail sent.",
+            "user_id": user.id,
+            "step": {
+                    "id": step.id,
+                    "name": step.name,
+                    "description": step.description,
+                    "level": step.level,
+                    "optional": step.optional,
+                },
+        }
+
+        if tokens:
+            response_data.update(tokens)
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
+

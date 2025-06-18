@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import UserRolesView, AssignRoleView, CreateOrUpdateRoleView, CreateOnboardingView, CreateOnboardingStepView, CompletedOnboardingStepsView, SetOnboardingStepDoneView, CancelMembershipView, AssignMembershipRolesView, CreateMembershipView, CreateSubscriptionTierView
+from .views import UserRolesView, AssignRoleView, CreateOrUpdateRoleView, CreateOnboardingView, CreateOnboardingStepView, CompletedOnboardingStepsView, SetOnboardingStepDoneView, CancelMembershipView, AssignMembershipRolesView, CreateMembershipView, CreateSubscriptionTierView, UserSignupWithOnboardingView
 
 urlpatterns = [
     path("user-roles/", UserRolesView.as_view()),
@@ -13,6 +13,8 @@ urlpatterns = [
     path("assign-membership-roles/", AssignMembershipRolesView.as_view()),
     path("create-membership/", CreateMembershipView.as_view()),
     path("create-subscription-tier/", CreateSubscriptionTierView.as_view()),
+    path("user-signup/", UserSignupWithOnboardingView.as_view()),
+
 
 
 ]
